@@ -1,0 +1,7 @@
+*.pyc
+*.ipa
+*.plist
+*/.DS_Store
+build
+dist
+ipublish.egg-info
