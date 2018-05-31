@@ -2,6 +2,8 @@
 
 # by wangweicheng
 
+__version__ = "1.0.2"
+
 from sys import argv
 from ipublish import core
 from ipublish import data

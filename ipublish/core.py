@@ -15,7 +15,7 @@ import re
 import zipfile
 from poster.encode import multipart_encode
 
-from iipublish.pyipa import Ipa
+from ipublish.pyipa import Ipa
 from ipublish import data
 from ipublish.progress import ProgressBar
 from ipublish.progress import IterableToFileAdapter
@@ -32,33 +32,41 @@ def getParmater():
     global pgy_key
     global target_name
     global upload_type
-    opts, args = getopt.getopt(sys.argv[1:], "hf:p:s:fpb", ["fir=", "pgy=","upload=", "scheme=", "help"])
-    for op, value in opts:
-        if op == "--upload":
-            upload_type = 0
-            if value is not None:
-                upload_script = value
-                data.add_custom_upload(value)
-        elif op == '-f' or op == '--fir':
-            upload_type = 1
-            if value is not None:
-                fir_token = value
-                data.add_fir_key(value)
-        elif op == '-p' or op == '--pgy':
-            upload_type = 2
-            if value is not None:
-                pgy_key = value
-                data.add_pgy_key(value)
-        elif op == '-b':
-            upload_type = -1
-        elif op == '-s' or op == '--scheme':
-            target_name = value
-        elif op == '-h' or op == '--help':
-            usage()
-            sys.exit()
-        else:
-            usage()
-            sys.exit()
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "fpbvhf:p:s:", ["fir=", "pgy=","upload=", "scheme=", "help","version"])
+        for op, value in opts:
+            if op == "--upload":
+                upload_type = 1
+                if value is not None:
+                    upload_script = value
+                    data.add_custom_upload(value)
+            elif op in ('-f','--fir'):
+                upload_type = 2
+                if value is not None:
+                    fir_token = value
+                    data.add_fir_key(value)
+            elif op in ('-p', '--pgy'):
+                upload_type = 3
+                if value is not None:
+                    pgy_key = value
+                    data.add_pgy_key(value)
+            elif op == '-b':
+                upload_type = 0
+            elif op in ('-s', '--scheme'):
+                target_name = value
+            elif op in ('-v', '--version'):
+                print('ipublish: v1.0.2')
+                sys.exit()
+            elif op in ('-h', '--help'):
+                usage()
+                sys.exit()
+            else:
+                usage()
+                sys.exit()
+    except getopt.GetoptError:
+        print('Wrong commond!!!')
+        usage()
+        sys.exit()
 
 def usage():
     print('Use ipublish [-f [value]|--fir=value]\n\
@@ -296,14 +304,14 @@ def main():
     if target_name is None:
         bar.log('[Error]Please run in the project\'s root directory.')
         return
-    if upload_type == -1:
+    if upload_type == 0:
         # 不上传到任何服务器
-        bar.log('Congratulations🍻\nPlease check in %s ' % targerIPA_parth)
-    elif upload_type == 0:
-        upload_custom() # 自定义上传
+        bar.log('Congratulations🍻\nPlease check the directory %s ' % targerIPA_parth)
     elif upload_type == 1:
-        upload_fir()    # 上传到 fir.im
+        upload_custom() # 自定义上传
     elif upload_type == 2:
+        upload_fir()    # 上传到 fir.im
+    elif upload_type == 3:
         upload_pgy()    # 上传到蒲公英
     elif upload_script is not None:
         upload_custom() # 自定义上传

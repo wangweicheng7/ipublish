@@ -31,7 +31,6 @@ def add_pgy_key(key):
 def custom_upload():
     data = read()
     key = os.getcwd()
-    print(key)
     custom_upload = {}
     custom_script = None
     if 'custom_upload' in data:
@@ -46,7 +45,6 @@ def add_custom_upload(script):
     key = os.getcwd()
     custom_upload = {}
     if 'custom_upload' in data:
-        print(key, script)
         custom_upload = data['custom_upload']
         custom_upload[key] = script
         data['custom_upload'] = custom_upload
@@ -57,14 +55,14 @@ def add_custom_upload(script):
 def write(data):
     json_str = json.dumps(data)
     new_dict = json.loads(json_str)
-    with open(path + '/.publish', 'w') as f:
+    with open(path + '/.ipublish', 'w') as f:
         json.dump(new_dict,f)
     f.close()
 
 def read():
     content = {}
     try:
-        with open(path + '/.publish','r') as f:
+        with open(path + '/.ipublish','r') as f:
             content = json.load(f)
             f.close()
     except IOError as error:

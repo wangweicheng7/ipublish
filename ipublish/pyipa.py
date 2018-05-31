@@ -46,20 +46,3 @@ class Ipa:
             m = pattern.match(path)
             if m is not None:
                 return m.group()
-
-# def print_ipa_info(plist_root):
-#     if 'CFBundleDisplayName' in plist_root:
-#         print ('Display Name: %s' % plist_root['CFBundleDisplayName'])
-#     else:
-#         print ('Display Name: %s' % plist_root['CFBundleName'])
-#     print ('Bundle Identifier: %s' % plist_root['CFBundleIdentifier'])
-#     print ('Version: %s' % plist_root['CFBundleShortVersionString'])
-
-# if __name__ == '__main__':
-#     args = sys.argv[1:]
-#     if len(args) < 1:
-#         print ('Usage: python3 ipaanalyze.py /path/to/ipa')
-
-#     ipa_path = args[0]
-#     ipa = Ipa(ipa_path)
-#     print_ipa_info(ipa.info)
