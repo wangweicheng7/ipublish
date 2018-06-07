@@ -27,7 +27,7 @@ class Ipa:
                 ipa_info = readPlistFromString(plist_data)
             except Exception as e :
                 print("Not a plist: %s" % e)
-                return -1
+                sys.exit()
         self.version = ipa_info['CFBundleShortVersionString']
         self.build = ipa_info['CFBundleVersion']
         if 'CFBundleDisplayName' in ipa_info:

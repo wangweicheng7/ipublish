@@ -55,7 +55,7 @@ def getParmater():
             elif op in ('-s', '--scheme'):
                 target_name = value
             elif op in ('-v', '--version'):
-                print('ipublish: v1.0.2')
+                print('ipublish: v1.0.3')
                 sys.exit()
             elif op in ('-h', '--help'):
                 usage()
@@ -129,16 +129,18 @@ def mkdir_build():
     '''清理打包缓存文件，创建构建文件夹
     '''
     bar.log('Generating compiled directory...')
+    os.system('rm -rf %s' % build_path)
     os.system('mkdir -p %s | tee %s/dir.log >/dev/null 2>&1' % (log_dir, log_dir))
     os.system('mkdir -p %s | tee %s/dir.log >/dev/null 2>&1' % (build_path, log_dir))
     os.system('mkdir -p %s | tee %s/dir.log >/dev/null 2>&1' % (targerIPA_parth, log_dir))
 
 def clean_project():
+    '''清理工程缓存
+    '''
     bar.log('Clean compiled caches...')
     code = os.system('xcodebuild clean | tee %s/clean.log >/dev/null 2>&1' % log_dir)
     if code != 0:
         error('Damn! Check the log %s' % log_dir)
-    os.system('rm -rf %s' % build_path)
 
 def get_scheme():
     bar.log("Read project infomations...")
@@ -158,6 +160,29 @@ def get_scheme():
         error('[Error]Please run in the project\'s root directory.')
     return proj
 
+def get_plist_info():
+    info = None
+    if sys.version_info < (3, 0):
+        from biplist import readPlist
+        info = readPlist(exportOptionsPlist)
+    else:
+        import plistlib
+        info = plistlib.readPlist(exportOptionsPlist)
+    global profile_name
+    global team_id
+    global bundle_id
+    profile_info = info['provisioningProfiles']
+    profile_name = None
+    team_id = info['teamID']
+    bundle_id = profile_info.keys()
+    keys = profile_info.keys()
+    if len(keys) == 0:
+        sys.exit()
+    bundle_id = keys[0]
+    profile_name = profile_info[bundle_id]
+    if profile_name == None:
+        sys.exit()
+
 def build_project():
     '''构建并导出 ipa
     '''
@@ -165,19 +190,33 @@ def build_project():
     if target_name is None:
         target_name = get_scheme()
     bar.log("Compiling...")
-    code = os.system('(xcodebuild -project %s.xcodeproj \
-    -scheme %s \
-    -configuration Release clean archive \
-    -archivePath %s \
-    ONLY_ACTIVE_ARCH=NO | tee %s/build.log >/dev/null 2>&1)|| exit' % (target_name,target_name,app_path, log_dir))
+    '''获取export options信息
+    '''
+    get_plist_info()
+    
+    code = os.system('(xcodebuild -project '+ target_name +'.xcodeproj \
+    -scheme '+ target_name +' \
+    -configuration Release clean archive build \
+    -archivePath '+ app_path +' \
+    DEVELOPMENT_TEAM='+ team_id +' \
+    CODE_SIGN_IDENTITY="iPhone Distribution" \
+    PROVISIONING_PROFILE='+ profile_name +' \
+    CODE_SIGN_STYLE="Manual" \
+    PRODUCT_BUNDLE_IDENTIFIER='+ bundle_id +' \
+    ONLY_ACTIVE_ARCH=NO | \
+    tee '+ log_dir +'/build.log >/dev/null 2>&1)|| exit')
     if code != 0:
-        error('Damn! Check the log %s/build.log' % log_dir)
+        error('Damn! Check the log '+ log_dir +'/build.log')
         
     bar.log("Export ipa...")
-    code = os.system('xcodebuild -exportArchive -archivePath %s \
-    -exportPath %s -exportOptionsPlist %s | tee %s/export.log >/dev/null 2>&1' % (app_path,targerIPA_parth, exportOptionsPlist, log_dir))
+    
+    code = os.system('xcodebuild -exportArchive \
+    -archivePath '+ app_path +' \
+    -exportPath '+ targerIPA_parth +' \
+    -exportOptionsPlist '+ exportOptionsPlist +' | \
+    tee '+ log_dir +'/export.log >/dev/null 2>&1')
     if code != 0:
-        error('Damn! Check the log %s/export.log' % log_dir)
+        error('Damn! Check the log '+ log_dir +'/export.log')
 
 def multipart_encode_for_requests(params, boundary=None, cb=None):
     datagen, headers = multipart_encode(params, boundary, cb)
@@ -297,8 +336,8 @@ def main():
     set_paths(curr_dir)
     bar.start()
     read_local_data()
-    clean_project()
     mkdir_build()
+    clean_project()
     build_project()
     bar.stop()
     if target_name is None:

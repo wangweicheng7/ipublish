@@ -2,7 +2,7 @@
 
 # by wangweicheng
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 from sys import argv
 from ipublish import core
