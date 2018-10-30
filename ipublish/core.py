@@ -17,8 +17,7 @@ from poster.encode import multipart_encode
 
 from ipublish.pyipa import Ipa
 from ipublish import data
-from ipublish.progress import ProgressBar
-from ipublish.progress import IterableToFileAdapter
+from ipublish.util import HUD, ProgressBar, IterableToFileAdapter
 
 upload_script = None
 fir_token = None
@@ -33,7 +32,7 @@ def getParmater():
     global target_name
     global upload_type
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "fpbvhf:p:s:", ["fir=", "pgy=","upload=", "scheme=", "help","version"])
+        opts, args = getopt.getopt(sys.argv[1:], "fpbvhf:p:s:", ["fir=", "pgy=","upload=", "scheme=", "help","version", "init"])
         for op, value in opts:
             if op == "--upload":
                 upload_type = 1
@@ -55,10 +54,16 @@ def getParmater():
             elif op in ('-s', '--scheme'):
                 target_name = value
             elif op in ('-v', '--version'):
-                print('ipublish: v1.0.3')
+                print('ipublish: v1.0.6')
                 sys.exit()
             elif op in ('-h', '--help'):
                 usage()
+                sys.exit()
+            elif op in ('--init'):
+                curr_dir = os.getcwd()
+                set_paths(curr_dir)
+                mkdir_build()
+                init_export_options()
                 sys.exit()
             else:
                 usage()
@@ -73,18 +78,20 @@ def usage():
     [-p [value]|--gpy=value]\n\
     [-s [value]|--scheme=value]\n\
     [--upload=value]\n\
+    [--init]\n\
 commond:\n\
     -b\t\t\tJust export ipa.\n\
     -f or --fir\t\tfir.im api_token.\n\
     -p or --pgy\t\tpgyer.com api key.\n\
     -s or --scheme\tXcode project scheme.\n\
-          --upload\tCustom upload python script.\
+          --upload\tCustom upload python script.\n\
+          --init\tAutomatic generation export options plist.\
         ')
 
 bar = ProgressBar(total = 200)
 
 def error(msg):
-    bar.stop()
+    HUD().stop()
     bar.log(msg)
     sys.exit(0)
 
@@ -161,6 +168,13 @@ def get_scheme():
     return proj
 
 def get_plist_info():
+    '''获取export options plist信息
+    '''
+    global profile_name
+    global team_id
+    global bundle_id
+    # 初始化export options plist
+    init_export_options()
     info = None
     if sys.version_info < (3, 0):
         from biplist import readPlist
@@ -168,12 +182,18 @@ def get_plist_info():
     else:
         import plistlib
         info = plistlib.readPlist(exportOptionsPlist)
-    global profile_name
-    global team_id
-    global bundle_id
-    profile_info = info['provisioningProfiles']
-    profile_name = None
     team_id = info['teamID']
+    build_type = info['signingStyle']
+    if build_type == 'automatic':
+        return False
+    elif build_type != 'manual':
+        error('[Error] The export option plist key \'signingStyle\' is invalid')
+    if info.has_key('provisioningProfiles'):
+        profile_info = info['provisioningProfiles']
+    else:
+        error('[Error] The export option plist key \'signingStyle\' is \'manual\', \n\tbut missed key \'provisioningProfiles\'.\
+        \n\tOr you can set \'signingStyle\' to \'automatic\'.')
+    profile_name = None
     bundle_id = profile_info.keys()
     keys = profile_info.keys()
     if len(keys) == 0:
@@ -182,6 +202,71 @@ def get_plist_info():
     profile_name = profile_info[bundle_id]
     if profile_name == None:
         sys.exit()
+    return True
+
+def init_export_options():
+    global bundle_id
+    bar.log("Read project configuration...")
+    team_id = None
+    signing_style = 'Automatic'
+    strip_swift_symbols = False
+    bitcode_enable = False
+    code = os.system('xcodebuild -showBuildSettings| tee %s/settings.log >/dev/null 2>&1' % log_dir)
+    if code != 0:
+        error('Damn! Check the log %s/settings.log' % log_dir)
+    f = open('%s/settings.log' % log_dir,'r')
+    settings_info = ''
+    for line in f.readlines():
+        settings_info += line
+    s = re.search(r'PRODUCT_BUNDLE_IDENTIFIER = (.+)\n', settings_info)
+    result = s.group(1)
+    if len(result) > 0:
+        bundle_id = result
+    else:
+        error('[Error]Please input the project\'s bundle id.')
+
+    if os.path.isfile(exportOptionsPlist):
+        return
+    s = re.search(r'DEVELOPMENT_TEAM = (.+)\n', settings_info)
+    
+    result = s.group(1)
+    if len(result) > 0:
+        team_id = result
+    else:
+        error('[Error]Development team is invalid.')
+    s = re.search(r'CODE_SIGN_STYLE = (.+)\n', settings_info)
+    result = s.group(1)
+    if len(result) > 0:
+        signing_style = result
+    s = re.search(r'STRIP_SWIFT_SYMBOLS = (.+)\n', settings_info)
+    result = s.group(1)
+    if len(result) > 0:
+        strip_swift_symbols = result
+    s = re.search(r'ENABLE_BITCODE = (.+)\n', settings_info)
+    result = s.group(1)
+    if len(result) > 0:
+        bitcode_enable = result
+    f.close()
+
+    if sys.version_info < (3, 0):
+        from biplist import writePlist
+    plist = {
+        'compileBitcode': bitcode_enable,
+        'method':'ad-hoc',
+        'signingStyle': signing_style.lower(),
+        'stripSwiftSymbols': strip_swift_symbols,
+        'teamID': team_id,
+        'thinning': '<none>',
+    }
+    bar.log("Init export options plist...")
+    writePlist(plist, exportOptionsPlist)
+
+def has_workspace(word):
+    path = './'
+    for filename in os.listdir(path):
+        re_filename = re.findall('.\w+', str(filename))
+        if word in re_filename[0]:
+            print(re_filename[0])
 
 def build_project():
     '''构建并导出 ipa
@@ -192,19 +277,35 @@ def build_project():
     bar.log("Compiling...")
     '''获取export options信息
     '''
-    get_plist_info()
-    
-    code = os.system('(xcodebuild -project '+ target_name +'.xcodeproj \
-    -scheme '+ target_name +' \
-    -configuration Release clean archive build \
-    -archivePath '+ app_path +' \
-    DEVELOPMENT_TEAM='+ team_id +' \
-    CODE_SIGN_IDENTITY="iPhone Distribution" \
-    PROVISIONING_PROFILE='+ profile_name +' \
-    CODE_SIGN_STYLE="Manual" \
-    PRODUCT_BUNDLE_IDENTIFIER='+ bundle_id +' \
-    ONLY_ACTIVE_ARCH=NO | \
-    tee '+ log_dir +'/build.log >/dev/null 2>&1)|| exit')
+    flag = get_plist_info()
+    # buildStr = 'xcodebuild -workspace '+target_name+'.xcworkspace '
+    buildStr = 'xcodebuild -project '+ target_name +'.xcodeproj '
+    if flag:
+        buildStr = buildStr +'-scheme '+ target_name +' \
+        -scheme '+ target_name +' \
+        -configuration Release clean archive build \
+        -archivePath '+ app_path +' \
+        DEVELOPMENT_TEAM='+ team_id +' \
+        CODE_SIGN_IDENTITY="iPhone Distribution" \
+        PROVISIONING_PROFILE='+ profile_name +' \
+        CODE_SIGN_STYLE="Manual" \
+        PRODUCT_BUNDLE_IDENTIFIER='+ bundle_id +' \
+        ONLY_ACTIVE_ARCH=NO'
+        print(buildStr)
+        code = os.system('('+ buildStr +' | \
+        tee '+ log_dir +'/build.log >/dev/null 2>&1)|| exit')
+    else:
+        buildStr = buildStr +'-scheme '+ target_name +' \
+        -configuration Release clean archive build \
+        -archivePath '+ app_path +' \
+        DEVELOPMENT_TEAM='+ team_id +' \
+        CODE_SIGN_IDENTITY="iPhone Developer" \
+        CODE_SIGN_STYLE="Automatic" \
+        PRODUCT_BUNDLE_IDENTIFIER='+ bundle_id +' \
+        ONLY_ACTIVE_ARCH=NO'
+        print(buildStr)
+        code = os.system('('+ buildStr +' | \
+        tee '+ log_dir +'/build.log >/dev/null 2>&1)|| exit')
     if code != 0:
         error('Damn! Check the log '+ log_dir +'/build.log')
         
@@ -231,7 +332,7 @@ def progress(param, current, total=0):
 def upload_pgy():
     # TODO: -p 时，没有key
     bar.log('Uploading pgyer.com ...')
-    bar.stop()
+    HUD().stop()
     path = targerIPA_parth + '/' + target_name + '.ipa'
     if not os.path.isfile(path):
         error('[Error]File is not exist.%s' % path)
@@ -289,7 +390,7 @@ def upload_fir():
             method = ipa_info['method']
         if method == 'ad-hoc':
             method = 'Adhoc'
-        elif method == 'inhouse':
+        elif method == 'enterprise':
             method = 'Inhouse'
     bar.log('Will upload ' + method + ' ipa')
     bar.log('Uploading ' + ipa.displayName + ' ' + method + ' to fir.im ...')
@@ -316,14 +417,14 @@ def upload_fir():
         openDownloadUrl(open_url)
     else:
         msg = res['message']
-        print('[Error]Upload failed %s' % msg)
+        error('[Error]Upload failed %s' % msg)
 
 def upload_custom():
     import subprocess
     if not os.path.isfile(upload_script):
         error('[Error]File is not exist.\n%s' % upload_script)
     cmd = 'python %s' % upload_script
-    bar.stop()
+    HUD().stop()
     subprocess.call(cmd, shell=True) 
     print('end upload!!!')
 
@@ -334,12 +435,12 @@ def main():
     getParmater()
     curr_dir = os.getcwd()
     set_paths(curr_dir)
-    bar.start()
+    HUD().start()
     read_local_data()
     mkdir_build()
     clean_project()
     build_project()
-    bar.stop()
+    HUD().stop()
     if target_name is None:
         bar.log('[Error]Please run in the project\'s root directory.')
         return
@@ -361,8 +462,13 @@ def main():
     else:
         # 不上传到任何服务器
         bar.log('Congratulations🍻\nPlease check in %s ' % targerIPA_parth)
-    bar.stop()
+    HUD().stop()
 
 if __name__ == '__main__':
-    main()
+    # main()
+    curr_dir = os.getcwd()
+    has_workspace('ipublish')
+    # set_paths(curr_dir)
+    # get_plist_info()
+    # init_export_options()
     # usage()

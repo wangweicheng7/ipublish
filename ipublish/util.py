@@ -3,33 +3,33 @@
 # by wangweicheng
 
 
-__all__ = ['ProgressBar', 'IterableToFileAdapter']
+__all__ = ['HUD','ProgressBar', 'IterableToFileAdapter']
 
+import sys
 import sys
 import threading
 import itertools
 import time
 
-class ProgressBar:
-    def __init__(self, count = 0, total = 0, width = 50):
-        self.count = count
-        self.total = total
-        self.width = width
-        self.complete = False
-        self.progress = False
-        self.isloading = False
-        self.loading = threading.Thread(target=self.loadingcycle, name='LoadingThread')
+def _singleton(cls):
+    instance = cls()
+    instance.__call__ = lambda: instance
+    return instance
 
-    def move(self, progress=0):
-        self.count = int(progress)
-        self.progress = True
-        self.run()
+@_singleton
+class HUD:
+    def __init__(self):
+        self.isloading = False
+        self.loading = threading.Thread(target=self._loadingcycle, name='LoadingThread')
 
     def start(self):
         self.isloading = True
         self.loading.start()
 
-    def loadingcycle(self):
+    def stop(self):
+        self.isloading = False
+    
+    def _loadingcycle(self):
         for c in itertools.cycle('|/-\\'): 
             if not self.isloading:
                 print('\r')
@@ -38,8 +38,18 @@ class ProgressBar:
             sys.stdout.flush()
             time.sleep(0.2)
 
-    def stop(self):
-        self.isloading = False
+class ProgressBar:
+    def __init__(self, count = 0, total = 0, width = 50):
+        self.count = count
+        self.total = total
+        self.width = width
+        self.complete = False
+        self.progress = False
+
+    def move(self, progress=0):
+        self.count = int(progress)
+        self.progress = True
+        self.run()
 
     def log(self, s):
         sys.stdout.write(' ' * (self.width + 19) + '\r')

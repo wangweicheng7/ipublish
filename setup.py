@@ -6,7 +6,7 @@ from setuptools import setup
 from setuptools import find_packages
  
 setup(name='ipublish',
-      version='1.0.4',
+      version='1.0.6',
       description='ios 发布工具',
       url='https://github.com/wangweicheng7/ipublish',
       author='wang weicheng',
@@ -14,7 +14,8 @@ setup(name='ipublish',
       license='MIT',
       packages=find_packages(),
       install_requires=['requests',
-      'poster',],
+      'poster',
+      'biplist'],
       entry_points={
         'console_scripts': [
             'ipublish-pgy = ipublish:add_pgy_key',

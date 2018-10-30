@@ -18,6 +18,11 @@ pip install ipublish
 	![](souces/exportoption.png)
 	
 	你也可以使用`Xcode`手动构建，在导出的`ipa`文件同目录下，你会发现生成的`ExportOptions.plist`文件，然后拷贝到工程根目录，就可以一劳永逸。
+3. 如果你还不太清楚`ExportOptions.plist`相关的信息，你可以配置好`Xcode`证书之后使用
+	
+	```
+	ipublish --init
+	```
 
 ### Quick Start
 
@@ -120,3 +125,4 @@ pip install ipublish
 		ipublish -b
 		```
 
+* 感谢我的朋友[Shayne](https://github.com/FCF5646448)提供给我的意见。*
