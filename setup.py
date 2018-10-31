@@ -6,7 +6,7 @@ from setuptools import setup
 from setuptools import find_packages
  
 setup(name='ipublish',
-      version='1.0.6',
+      version='1.0.7',
       description='ios 发布工具',
       url='https://github.com/wangweicheng7/ipublish',
       author='wang weicheng',

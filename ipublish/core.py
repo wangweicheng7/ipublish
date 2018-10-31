@@ -261,12 +261,16 @@ def init_export_options():
     bar.log("Init export options plist...")
     writePlist(plist, exportOptionsPlist)
 
-def has_workspace(word):
+def has_workspace():
     path = './'
     for filename in os.listdir(path):
-        re_filename = re.findall('.\w+', str(filename))
-        if word in re_filename[0]:
-            print(re_filename[0])
+        re_filename = re.findall(r'\w+.xcworkspace', str(filename))
+        if len(re_filename) == 0:
+            pass
+        else:
+            
+            return re_filename[0]
+    return ''
 
 def build_project():
     '''构建并导出 ipa
@@ -278,8 +282,13 @@ def build_project():
     '''获取export options信息
     '''
     flag = get_plist_info()
-    # buildStr = 'xcodebuild -workspace '+target_name+'.xcworkspace '
+    # 选择编译方式
     buildStr = 'xcodebuild -project '+ target_name +'.xcodeproj '
+    workspace = has_workspace()
+    if len(workspace) > 0:
+        bar.log("%s will be compiled..." % workspace)
+        buildStr = 'xcodebuild -workspace '+target_name+'.xcworkspace '
+    
     if flag:
         buildStr = buildStr +'-scheme '+ target_name +' \
         -scheme '+ target_name +' \
@@ -467,7 +476,6 @@ def main():
 if __name__ == '__main__':
     # main()
     curr_dir = os.getcwd()
-    has_workspace('ipublish')
     # set_paths(curr_dir)
     # get_plist_info()
     # init_export_options()
