@@ -54,7 +54,7 @@ def getParmater():
             elif op in ('-s', '--scheme'):
                 target_name = value
             elif op in ('-v', '--version'):
-                print('ipublish: v1.0.6')
+                print('ipublish: v1.0.7')
                 sys.exit()
             elif op in ('-h', '--help'):
                 usage()
